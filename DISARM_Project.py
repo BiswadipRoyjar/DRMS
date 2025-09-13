@@ -1,102 +1,141 @@
-
-# DISARM: Disaster Risk Assessment and Monitoring
-# Author: Biswadip Roy
-# Email: biswadip.roy.tech@gmail.com
+# -----------------------------
+# DISARM: Master Global Disaster Scanner
+# -----------------------------
 
 import ee
 import geemap
 
-# Initialize Earth Engine
-try:
-    ee.Initialize()
-except Exception as e:
-    ee.Authenticate()
-    ee.Initialize()
+# Authenticate and initialize Earth Engine
+ee.Authenticate()
+ee.Initialize()
 
-# Define ROI as the whole world
-roi = ee.Geometry.Polygon(
-    [[[-180, -90], [-180, 90], [180, 90], [180, -90], [-180, -90]]]
-)
+# -----------------------------
+# Step 1: Define Global ROI
+# -----------------------------
+roi = ee.Geometry.Rectangle([-180, -90, 180, 90])
 
-# ---------------------------------------------
-# 1. Flood Detection
-# ---------------------------------------------
-s1 = ee.ImageCollection("COPERNICUS/S1_GRD") \    .filterBounds(roi) \    .filterDate('2025-08-01', '2025-08-31') \    .filter(ee.Filter.eq('instrumentMode', 'IW'))
+# -----------------------------
+# Step 2: NDVI Pre/Post for vegetation-based indices
+# -----------------------------
+# Pre-disaster NDVI (2 months ago)
+ndvi_pre = ee.ImageCollection('COPERNICUS/S2') \
+            .filterDate('2025-06-01', '2025-06-30') \
+            .filterBounds(roi) \
+            .map(lambda img: img.normalizedDifference(['B8','B4']).rename('NDVI')) \
+            .median()
 
-vh = s1.select('VH').mean()
-flooded = vh.gt(-18).selfMask()  # threshold for flooded areas
+# Post-disaster NDVI (last month)
+ndvi_post = ee.ImageCollection('COPERNICUS/S2') \
+             .filterDate('2025-08-01', '2025-08-31') \
+             .filterBounds(roi) \
+             .map(lambda img: img.normalizedDifference(['B8','B4']).rename('NDVI')) \
+             .median()
 
-# ---------------------------------------------
-# 2. Burned Area (Wildfire)
-# ---------------------------------------------
-modis_burn = ee.ImageCollection("MODIS/006/MCD64A1") \    .filterDate('2025-08-01', '2025-08-31') \    .select('BurnDate') \    .mean()
+ndvi_drop = ndvi_pre.subtract(ndvi_post).unitScale(0,1)
 
-burned_area = modis_burn.gt(0).selfMask()
+# -----------------------------
+# Step 3: Flood Index (example)
+# -----------------------------
+flooded = ee.ImageCollection('COPERNICUS/S1_GRD')\
+           .filterDate('2025-08-01','2025-08-31')\
+           .filterBounds(roi)\
+           .mean()  # placeholder
+flood_norm = flooded.unitScale(0,1)
 
-# ---------------------------------------------
-# 3. Drought Monitoring
-# ---------------------------------------------
-chirps = ee.ImageCollection("UCSB-CHG/CHIRPS/DAILY") \    .filterDate('2025-06-01', '2025-08-31') \    .select('precipitation')
+# -----------------------------
+# Step 4: Burned Area / Wildfire Index (example using NDVI drop)
+# -----------------------------
+burned_area = ndvi_drop  # for demo
+burned_norm = burned_area.unitScale(0,1)
 
-precip = chirps.mean()
-precip_norm = precip.unitScale(0, 300)
+# -----------------------------
+# Step 5: Drought Index (example using NDVI + precipitation)
+# -----------------------------
+# CHIRPS monthly precipitation
+precip = ee.ImageCollection('UCSB-CHG/CHIRPS/DAILY')\
+          .filterDate('2025-08-01', '2025-08-31')\
+          .sum()
+precip_norm = precip.unitScale(0,300)
 
-ndvi = ee.ImageCollection("MODIS/061/MOD13A2") \    .filterDate('2025-06-01', '2025-08-31') \    .select('NDVI') \    .mean()
+ndvi_norm = ndvi_post.unitScale(0,1)
+drought_index = (ee.Image(1).subtract(ndvi_norm).add(ee.Image(1).subtract(precip_norm))).divide(2)
+drought_norm = drought_index
 
-ndvi_norm = ndvi.unitScale(0, 9000)
-drought_index = (ndvi_norm.multiply(0.5).add(precip_norm.multiply(0.5))).multiply(-1)
+# -----------------------------
+# Step 6: Landslide Index
+# -----------------------------
+dem = ee.Image('USGS/SRTMGL1_003')
+slope = ee.Terrain.slope(dem)
+slope_norm = slope.unitScale(0,60)
 
-# ---------------------------------------------
-# 4. Landslide Risk
-# ---------------------------------------------
-srtm = ee.Image("USGS/SRTMGL1_003")
-slope = ee.Terrain.slope(srtm)
+# Monthly rainfall for landslide
+rain = precip
+rain_norm = rain.unitScale(0,300)
 
-ndvi_pre = ee.ImageCollection("MODIS/061/MOD13A2").filterDate('2025-06-01', '2025-06-30').select('NDVI').mean()
-ndvi_post = ee.ImageCollection("MODIS/061/MOD13A2").filterDate('2025-08-01', '2025-08-31').select('NDVI').mean()
-ndvi_drop = ndvi_pre.subtract(ndvi_post).unitScale(0, 1)
+landslide_index = slope_norm.add(rain_norm).add(ndvi_drop).divide(3)
 
-rain = chirps.sum().unitScale(0, 500)
-landslide_index = slope.unitScale(0, 60).add(ndvi_drop).add(rain).divide(3)
+# -----------------------------
+# Step 7: Heatwave Index
+# -----------------------------
+lst = ee.ImageCollection('MODIS/006/MOD11A2')\
+        .filterDate('2025-08-01','2025-08-31')\
+        .select('LST_Day_1km')\
+        .mean()\
+        .multiply(0.02)
 
-# ---------------------------------------------
-# 5. Heatwave Risk
-# ---------------------------------------------
-era5 = ee.ImageCollection("ECMWF/ERA5/DAILY") \    .filterDate('2025-08-01', '2025-08-31')
+heatwave_index = lst.unitScale(250,330)
 
-temp = era5.select('mean_2m_air_temperature').mean().subtract(273.15)
-temp_norm = temp.unitScale(20, 50)
+# -----------------------------
+# Step 8: Cyclone / Storm Index
+# -----------------------------
+era5 = ee.ImageCollection('ECMWF/ERA5/DAILY')\
+          .filterDate('2025-08-01','2025-08-31')
 
-heatwave_index = temp_norm
+era5_mean = era5.mean()
+u = era5_mean.select('u_component_of_wind_10m')
+v = era5_mean.select('v_component_of_wind_10m')
+wind = u.pow(2).add(v.pow(2)).sqrt()
+wind_norm = wind.unitScale(0,50)
 
-# ---------------------------------------------
-# 6. Cyclone Risk
-# ---------------------------------------------
-u_wind = era5.select('u_component_of_wind_10m').mean()
-v_wind = era5.select('v_component_of_wind_10m').mean()
-wind_speed = u_wind.pow(2).add(v_wind.pow(2)).sqrt()
+rain = era5.select('total_precipitation').sum()
+rain_norm = rain.unitScale(0,0.5)
 
-wind_norm = wind_speed.unitScale(0, 50)
-cyclone_index = wind_norm
+cyclone_index = wind_norm.add(rain_norm).divide(2)
 
-# ---------------------------------------------
-# Combine All Indices
-# ---------------------------------------------
-flood_norm = flooded.unitScale(0, 1)
-burned_norm = burned_area.unitScale(0, 1)
-drought_norm = drought_index.unitScale(-1, 1)
+# -----------------------------
+# Step 9: Combine all 6 indices
+# -----------------------------
+disaster_index = flood_norm.add(burned_norm)\
+                           .add(drought_norm)\
+                           .add(landslide_index)\
+                           .add(heatwave_index)\
+                           .add(cyclone_index)\
+                           .divide(6)
 
-disaster_index = (flood_norm.add(burned_norm).add(drought_norm)
-                  .add(landslide_index).add(heatwave_index).add(cyclone_index)) \                  .divide(6)
+# High-risk areas (>0.7)
+alert_threshold = 0.7
+high_risk = disaster_index.gt(alert_threshold)
 
-# ---------------------------------------------
-# Visualization
-# ---------------------------------------------
-Map = geemap.Map(center=[20, 0], zoom=2)
-disaster_vis = {'min': 0, 'max': 1, 'palette': ['green','yellow','orange','red']}
-
-Map.addLayer(disaster_index, disaster_vis, 'Global DISARM Disaster Index')
+# -----------------------------
+# Step 10: Map Visualization
+# -----------------------------
+Map = geemap.Map(center=[0,0], zoom=2)
+Map.addLayer(disaster_index, {'min':0,'max':1,'palette':['green','yellow','orange','red']}, 'DISARM Global Index')
+Map.addLayer(high_risk.updateMask(high_risk), {'palette':['red']}, 'High Risk Areas')
 Map.addLayer(roi, {}, 'ROI')
-
-# Display Map
+Map.addLayerControl()
 Map
+
+# -----------------------------
+# Step 11: Export Disaster Index
+# -----------------------------
+export_task = ee.batch.Export.image.toDrive(
+    image=disaster_index,
+    description='DISARM_Global_DisasterIndex',
+    folder='DISARM_Exports',
+    fileNamePrefix='disaster_index_global',
+    scale=1000,
+    region=roi.getInfo()['coordinates']
+)
+export_task.start()
+print("✅ Export task started: DISARM_Global_DisasterIndex")
