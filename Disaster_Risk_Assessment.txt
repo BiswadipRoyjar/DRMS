@@ -1,0 +1,99 @@
+# 🌍 Multi-Disaster Risk Assessment using Google Earth Engine  
+
+**Author:** Biswadip Roy  
+📧 **Email:** biswadip.roy.tech@gmail.com  
+
+---
+
+## 🚀 Project Overview  
+
+This project leverages **Google Earth Engine (GEE)** to create a **multi-disaster risk assessment model**.  
+It integrates **satellite imagery + climate datasets** to detect and analyze areas prone to:  
+
+- 🌊 Flood  
+- 🔥 Wildfire  
+- 🌵 Drought  
+- 🪨 Landslide  
+- 🌡️ Heatwave  
+- 🌪️ Cyclone  
+
+The final output is a **Disaster Risk Index (DRI)** map, which highlights **high, medium, and low-risk zones**.  
+
+---
+
+## 🛠️ Tools & Technologies Used  
+
+- **Google Earth Engine (GEE)** → Processing satellite & climate data  
+- **Python / JavaScript API** → For scripting disaster indices  
+- **Datasets Used:**  
+  - *Sentinel-1 SAR* → Flood detection  
+  - *MODIS Burned Area* → Fire mapping  
+  - *CHIRPS Rainfall* → Drought monitoring  
+  - *Sentinel-2 NDVI* → Vegetation loss (landslides, drought)  
+  - *ERA5 Climate Reanalysis* → Heatwaves & Cyclones  
+
+---
+
+## 🔄 Workflow  
+
+1. **Data Collection** → Extract satellite data from GEE (Sentinel, MODIS, CHIRPS, ERA5).  
+2. **Preprocessing** → Normalize indices like NDVI, rainfall, temperature, wind speed.  
+3. **Hazard Detection** → Build individual models for each disaster:  
+   - Flood = Sentinel-1 backscatter  
+   - Wildfire = MODIS Burned Area Index  
+   - Drought = CHIRPS Rainfall Anomaly  
+   - Landslide = NDVI Drop + Rainfall + Slope  
+   - Heatwave = Temperature Anomaly  
+   - Cyclone = Wind Speed + Pressure Drop  
+4. **Risk Index** → Combine all hazards → generate **composite DRI**.  
+5. **Visualization** → Display risk maps in GEE interactive map viewer.  
+
+---
+
+## ✨ Unique Features  
+
+- Combines **6 disasters into one unified model**.  
+- Works on **real-time satellite data** (no manual input needed).  
+- Scalable → Can be expanded to more regions/datasets.  
+- Useful for **government agencies, NGOs, and disaster response teams**.  
+- Can integrate into **mobile apps or dashboards** for early warning systems.  
+
+---
+
+## 📊 Model Capabilities  
+
+- Detects **flood-prone regions** using radar signals.  
+- Tracks **wildfire spread** using burn indices.  
+- Identifies **drought-hit areas** from rainfall anomalies.  
+- Highlights **landslide risks** using vegetation loss + slope.  
+- Maps **heatwave intensity zones**.  
+- Monitors **cyclone strength & path**.  
+
+---
+
+## 🖥️ How to Run  
+
+1. Open Google Colab.  
+2. Upload the notebook `DISARM-AI_Disaster_detection.ipynb`.  
+3. Run cells to authenticate GEE & visualize outputs.  
+4. Export results as maps or GeoTIFF for external use.  
+
+---
+
+## 📌 Future Improvements  
+
+- Add **real-time alert system** (email/SMS alerts).  
+- Integrate **AI/ML models** for predictive disaster mapping.  
+- Deploy as a **web dashboard / mobile app**.  
+
+---
+
+## 🤝 Contributions  
+
+Pull requests are welcome! If you’d like to add new datasets, visualizations, or extend the model → open an issue.  
+
+---
+
+## 📜 License  
+
+MIT License © 2025 Biswadip Roy  
